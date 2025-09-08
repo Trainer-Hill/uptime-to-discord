@@ -6,6 +6,7 @@ Runs inside Docker with a configurable schedule and minimal setup.
 ---
 
 ## ✨ Features
+
 - ✅ Monitor multiple URLs via environment variables or a simple file
 - ✅ Dockerized with cron scheduling
 - ✅ Sends clean Discord embeds with failure reasons & latency
@@ -17,6 +18,7 @@ Runs inside Docker with a configurable schedule and minimal setup.
 ## 🚀 Quick Start
 
 ### 1. Clone & Build
+
 ```bash
 git clone https://github.com/YOURNAME/uptime-to-discord.git
 cd uptime-to-discord
@@ -65,15 +67,13 @@ docker run -d \
 | `HEALTHCHECK_URLS`    | ❌        | –               | List of URLs to check (newline/comma/space separated)   |
 | `URLS_FILE`           | ❌        | `/app/urls.txt` | Path to file containing URLs (one per line)             |
 | `CRON_SCHEDULE`       | ❌        | `*/5 * * * *`   | Cron expression for check frequency                     |
-| `REQUEST_TIMEOUT`     | ❌        | `10`            | Request timeout (seconds)                               |
-
 ---
 
 ## 📝 Example Alert
 
 When a failure is detected, the bot sends an embed like:
 
-```
+```text
 🚨 URL Health Check: FAIL
 2/5 endpoints failing in **prod**
 Host: myserver · 2025-09-08 12:34:56 UTC
