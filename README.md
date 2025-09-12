@@ -67,6 +67,7 @@ docker run -d \
 | `HEALTHCHECK_URLS`    | ❌        | –               | List of URLs to check (newline/comma/space separated)   |
 | `URLS_FILE`           | ❌        | `/app/urls.txt` | Path to file containing URLs (one per line)             |
 | `CRON_SCHEDULE`       | ❌        | `*/5 * * * *`   | Cron expression for check frequency                     |
+
 ---
 
 ## 📝 Example Alert

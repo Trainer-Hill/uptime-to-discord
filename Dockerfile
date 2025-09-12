@@ -1,32 +1,36 @@
-# Use a lightweight base image with Python
 FROM python:3.11-slim
 
-# Install cron
-RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
+# 1) App deps
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
-
-# Copy Python requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy your script(s) and .env file
 COPY monitor.py .
-COPY .env .
 
-# ENV vars (defaults; can be overridden at runtime)
-ENV RUN_MODE="cron" \
-    CRON_SCHEDULE="5 * * * *"   # default: every 5 minutes
+# 2) Install supercronic (single static binary)
+# Latest releases available at https://github.com/aptible/supercronic/releases
+ENV SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.2.34/supercronic-linux-amd64 \
+    SUPERCRONIC_SHA1SUM=e8631edc1775000d119b70fd40339a7238eece14 \
+    SUPERCRONIC=supercronic-linux-amd64
 
-# Entry point
-CMD if [ "$RUN_MODE" = "cron" ]; then \
-      echo "$CRON_SCHEDULE bash -c 'set -a && . /app/.env && python /app/monitor.py' >> /var/log/cron.log 2>&1" \
-        > /etc/cron.d/my-cron && \
-      chmod 0644 /etc/cron.d/my-cron && \
-      crontab /etc/cron.d/my-cron && \
-      touch /var/log/cron.log && \
-      cron && tail -f /var/log/cron.log; \
-    else \
-      set -a && . /app/.env && python /app/monitor.py; \
-    fi
+RUN curl -fsSLO "$SUPERCRONIC_URL" \
+ && echo "${SUPERCRONIC_SHA1SUM}  ${SUPERCRONIC}" | sha1sum -c - \
+ && chmod +x "$SUPERCRONIC" \
+ && mv "$SUPERCRONIC" "/usr/local/bin/${SUPERCRONIC}" \
+ && ln -s "/usr/local/bin/${SUPERCRONIC}" /usr/local/bin/supercronic
+
+# 3) Crontab with env expansion (no 'root' column)
+# You can keep the schedule configurable via CRON_SCHEDULE
+ENV PY_BIN=/usr/local/bin/python
+ENV CRON_SCHEDULE="*/1 * * * *"
+
+# Build the crontab at runtime so $CRON_SCHEDULE expands before supercronic parses it
+CMD /bin/bash -lc '\
+  printf "%s\n" \
+    "SHELL=/bin/bash" \
+    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    "$CRON_SCHEDULE $PY_BIN -u /app/monitor.py" \
+    "$CRON_SCHEDULE echo \"[tick] \$(date -Iseconds)\" " \
+    > /etc/supercronic.crontab && \
+  exec /usr/local/bin/supercronic -json /etc/supercronic.crontab'
