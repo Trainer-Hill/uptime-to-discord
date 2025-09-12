@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>URL Status Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    table { border-collapse: collapse; width: 100%; max-width: 800px; }
+    th, td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd; }
+    th { text-align: left; background: #f2f2f2; }
+    .status-ok { color: green; font-weight: bold; }
+    .status-fail { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>URL Status Dashboard</h1>
+
+  <!-- Inline your URLs so no extra fetch is needed -->
+  <script type="application/json" id="health-url-list">
+  [
+    "https://badges.trainerhill.com/health",
+    "https://www.trainerhill.com/health",
+    "https://api.trainerhill.com/health",
+    "https://city.trainerhill.com/health"
+  ]
+  </script>
+
+  <table id="status-table">
+    <thead>
+      <tr><th>URL</th><th>Status</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+function getUrls() {
+  try {
+    const el = document.getElementById('health-url-list');
+    return JSON.parse(el.textContent.trim());
+  } catch {
+    return [];
+  }
+}
+
+async function checkUrl(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  const busted = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now(); // avoid caches
+
+  try {
+    // 1) Try normal CORS first so we can read the real status if allowed
+    const resp = await fetch(busted, { signal: controller.signal, mode: 'cors' });
+    clearTimeout(timeout);
+    return resp.ok ? { state: 'ok', detail: 'HTTP ' + resp.status }
+                   : { state: 'fail', detail: 'HTTP ' + resp.status };
+  } catch (e) {
+    // 2) Fall back: no-cors — resolves to opaque if network reachable
+    try {
+      const resp2 = await fetch(busted, { signal: controller.signal, mode: 'no-cors' });
+      clearTimeout(timeout);
+      // resp2 is opaque; we can’t read status, but resolve => network path worked
+      if (resp2 && resp2.type === 'opaque') {
+        return { state: 'opaque', detail: 'CORS blocked (opaque response)' };
+      }
+      // Some browsers may yield status 0; treat as opaque success if not rejected
+      return { state: 'opaque', detail: 'CORS blocked (opaque)' };
+    } catch (e2) {
+      clearTimeout(timeout);
+      // Network/DNS/connection failure or timeout
+      return { state: 'down', detail: 'No network response' };
+    }
+  }
+}
+
+async function run() {
+  const urls = getUrls();
+  const tbody = document.querySelector('#status-table tbody');
+  tbody.innerHTML = '';
+
+  if (urls.length === 0) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 2;
+    td.textContent = 'No URLs found.';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  for (const url of urls) {
+    const tr = document.createElement('tr');
+    const urlTd = document.createElement('td');
+    urlTd.textContent = url;
+    const statusTd = document.createElement('td');
+    statusTd.textContent = 'Checking...';
+    tr.appendChild(urlTd);
+    tr.appendChild(statusTd);
+    tbody.appendChild(tr);
+
+    checkUrl(url).then(res => {
+    if (res.state === 'ok') {
+        statusTd.textContent = 'Connected';
+        statusTd.className = 'status-ok';
+        statusTd.title = res.detail;
+    } else if (res.state === 'fail') {
+        statusTd.textContent = 'Responded (error)';
+        statusTd.className = 'status-fail';
+        statusTd.title = res.detail;
+    } else if (res.state === 'opaque') {
+        statusTd.textContent = 'Responded (opaque)';
+        statusTd.className = 'status-ok'; // or neutral; up to you
+        statusTd.title = res.detail;
+    } else {
+        statusTd.textContent = 'Disconnected';
+        statusTd.className = 'status-fail';
+        statusTd.title = res.detail;
+    }
+    });
+  }
+}
+run();
+  </script>
+</body>
+</html>
