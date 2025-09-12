@@ -126,7 +126,7 @@ def notify_discord_on_failures(failures, total_urls):
     # Ping responders (use @here by default; replace with a role mention if desired)
     # Example for role ping: content='<@&ROLE_ID>'
     allowed = discord.AllowedMentions(everyone=True)
-    hook.send(content='@here', embed=embed, allowed_mentions=allowed)
+    hook.send(content='@everyone', embed=embed, allowed_mentions=allowed)
 
 
 if __name__ == '__main__':
